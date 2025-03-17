@@ -1,28 +1,37 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { createContext, useContext, useEffect, useState } from "react"
+import { onAuthStateChanged, User } from "firebase/auth"
 import { auth } from "@/FirebaseConfig"
 
+type FirebaseContextType = {
+  user: User | null
+  loading: boolean
+}
+
+const FirebaseContext = createContext<FirebaseContextType>({
+  user: null,
+  loading: true,
+})
+
 export function FirebaseProvider({ children }: { children: React.ReactNode }) {
-  const [isInitialized, setIsInitialized] = useState(false)
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Wait for auth to initialize before showing the children
-    const unsubscribe = auth.onAuthStateChanged(() => {
-      setIsInitialized(true)
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setUser(user)
+      setLoading(false)
     })
 
     return () => unsubscribe()
   }, [])
 
-  // Show loading state while Firebase initializes
-  if (!isInitialized) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    )
-  }
-
-  return <>{children}</>
+  return (
+    <FirebaseContext.Provider value={{ user, loading }}>
+      {!loading && children}
+    </FirebaseContext.Provider>
+  )
 }
+
+export const useFirebase = () => useContext(FirebaseContext)
