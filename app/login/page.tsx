@@ -1,29 +1,81 @@
 "use client"
 
-import React, { useState } from 'react'
+import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
 import { ArrowRight, Mail, Shield, AlertCircle, CheckCircle, Upload } from "lucide-react"
 import Link from "next/link"
-import { getAuth, sendSignInLinkToEmail } from "firebase/auth"
-import { useToast } from "@/components/ui/use-toast"
+import { useRouter } from "next/navigation"
+import { auth } from "@/FirebaseConfig"
+import { sendSignInLinkToEmail, isSignInWithEmailLink, signInWithEmailLink } from "firebase/auth"
+import { useToast } from "@/hooks/use-toast"
+import { useAuth } from "@/context/auth-context"
 
 export default function LoginPage() {
+  const { user } = useAuth()
   const [email, setEmail] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const { toast } = useToast()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (user) {
+      router.push('/upload-resume')
+    }
+  }, [user, router])
+
+  // Check if the user is coming back from email link
+  useEffect(() => {
+    // Get the email from localStorage
+    const savedEmail = window.localStorage.getItem('emailForSignIn')
+    
+    if (isSignInWithEmailLink(auth, window.location.href)) {
+      // Additional state check
+      if (!savedEmail) {
+        toast({
+          title: "Error",
+          description: "Could not find your email. Please try signing in again.",
+          variant: "destructive",
+          icon: <AlertCircle className="w-4 h-4" />
+        })
+        return
+      }
+
+      setIsLoading(true)
+      // Sign in with email link
+      signInWithEmailLink(auth, savedEmail, window.location.href)
+        .then((result) => {
+          // Clear email from storage
+          window.localStorage.removeItem('emailForSignIn')
+          // Redirect to dashboard
+          router.push('/upload-resume')
+          toast({
+            title: "Success",
+            description: "You have been successfully signed in!",
+            icon: <CheckCircle className="w-4 h-4 text-green-500" />
+          })
+        })
+        .catch((error) => {
+          toast({
+            title: "Error",
+            description: error.message || "Failed to sign in. Please try again.",
+            variant: "destructive",
+            icon: <AlertCircle className="w-4 h-4" />
+          })
+        })
+        .finally(() => {
+          setIsLoading(false)
+        })
+    }
+  }, [router, toast])
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
 
     try {
-      const auth = getAuth()
       const actionCodeSettings = {
-        // URL you want to redirect back to. The domain (www.example.com) for this
-        // URL must be in the authorized domains list in the Firebase Console.
-        url: `${window.location.origin}/dashboard`,
-        // This must be true.
+        url: `${window.location.origin}/login`, // Redirect back to login page to handle the sign-in
         handleCodeInApp: true
       }
 
@@ -48,6 +100,22 @@ export default function LoginPage() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  // If loading, show loading state
+  if (isLoading && isSignInWithEmailLink(auth, window.location.href)) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="flex flex-col items-center"
+        >
+          <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
+          <p className="text-muted-foreground">Signing you in...</p>
+        </motion.div>
+      </div>
+    )
   }
 
   return (
