@@ -3,6 +3,7 @@
 import { initializeApp, getApps } from "firebase/app"
 import { getAuth } from "firebase/auth"
 import { getAnalytics, isSupported } from "firebase/analytics"
+import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDZFETF1t_h5CfT_xBt94U3WmQfWzNObo8",
@@ -17,6 +18,7 @@ const firebaseConfig = {
 // Initialize Firebase only if it hasn't been initialized already
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApps()[0]
 const auth = getAuth(app)
+const storage = getStorage(app);
 
 // Initialize Analytics only in browser environment
 let analytics = null
@@ -24,4 +26,4 @@ if (typeof window !== 'undefined') {
   isSupported().then(yes => yes && (analytics = getAnalytics(app)))
 }
 
-export { auth, analytics, app }
+export { auth, analytics, app , storage }

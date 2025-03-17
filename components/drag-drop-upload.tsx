@@ -1,17 +1,23 @@
 "use client"
 
-import type React from "react"
-
 import { useState, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Upload, FileText, CheckCircle, AlertCircle, X, FileUp } from "lucide-react"
+import { storage } from "@/FirebaseConfig"
+import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage"
+import { useAuth } from "@/context/auth-context"
+import { generateUUID } from "@/utils/generate-id"
+import { useToast } from "@/hooks/use-toast"
 
 export function DragDropUpload() {
   const [isDragging, setIsDragging] = useState(false)
   const [file, setFile] = useState<File | null>(null)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [uploadStatus, setUploadStatus] = useState<"idle" | "uploading" | "success" | "error">("idle")
+  const [fileUrl, setFileUrl] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const { user } = useAuth()
+  const { toast } = useToast()
 
   const handleDragEnter = (e: React.DragEvent) => {
     e.preventDefault()
@@ -48,34 +54,89 @@ export function DragDropUpload() {
     }
   }
 
-  const validateAndUploadFile = (file: File) => {
+  const validateAndUploadFile = async (file: File) => {
     // Check if file is PDF or DOCX
     const validTypes = ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"]
     if (!validTypes.includes(file.type)) {
       setUploadStatus("error")
+      toast({
+        title: "Invalid file type",
+        description: "Please upload a PDF or DOCX file",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (!user) {
+      setUploadStatus("error")
+      toast({
+        title: "Authentication required",
+        description: "Please sign in to upload files",
+        variant: "destructive",
+      })
       return
     }
 
     setFile(file)
     setUploadStatus("uploading")
 
-    // Simulate upload progress
-    let progress = 0
-    const interval = setInterval(() => {
-      progress += 5
-      setUploadProgress(progress)
+    try {
+      const resumeId = generateUUID()
+      const fileExtension = file.name.split('.').pop()
+      const storageRef = ref(storage, `resumes/${user.uid}/${resumeId}.${fileExtension}`)
+      
+      const uploadTask = uploadBytesResumable(storageRef, file)
 
-      if (progress >= 100) {
-        clearInterval(interval)
-        setUploadStatus("success")
-      }
-    }, 100)
+      uploadTask.on('state_changed',
+        (snapshot) => {
+          // Handle progress
+          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100
+          setUploadProgress(progress)
+          console.log('Upload is ' + progress + '% done')
+        },
+        (error) => {
+          // Handle error
+          console.error('Upload error:', error)
+          setUploadStatus("error")
+          toast({
+            title: "Upload failed",
+            description: "There was an error uploading your file",
+            variant: "destructive",
+          })
+        },
+        async () => {
+          // Handle success
+          try {
+            const downloadURL = await getDownloadURL(uploadTask.snapshot.ref)
+            setFileUrl(downloadURL)
+            console.log('File available at', downloadURL)
+            setUploadStatus("success")
+            toast({
+              title: "Upload complete",
+              description: "Your resume has been uploaded successfully",
+            })
+          } catch (error) {
+            console.error('Error getting download URL:', error)
+            setUploadStatus("error")
+          }
+        }
+      )
+    } catch (error) {
+      console.error('Upload error:', error)
+      setUploadStatus("error")
+      toast({
+        title: "Upload failed",
+        description: "There was an error uploading your file",
+        variant: "destructive",
+      })
+    }
   }
 
   const resetUpload = () => {
     setFile(null)
     setUploadProgress(0)
     setUploadStatus("idle")
+    setFileUrl(null)
     if (fileInputRef.current) {
       fileInputRef.current.value = ""
     }
@@ -227,9 +288,16 @@ export function DragDropUpload() {
               {uploadStatus === "success" && (
                 <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
                   <div className="flex justify-end mt-4">
-                    <motion.button className="btn-primary" whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                      View Analysis
-                    </motion.button>
+                    <motion.a
+                      href={fileUrl || '#'}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn-primary"
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      View File
+                    </motion.a>
                   </div>
                 </motion.div>
               )}
