@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import { AuthProvider } from "@/context/auth-context"
+import { FirebaseProvider } from "@/components/providers/firebase-provider"
 
 export const metadata: Metadata = {
   title: 'ATS Resume Tracker',
@@ -16,9 +17,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <AuthProvider>
-          {children}
-        </AuthProvider>
+        <FirebaseProvider>
+          <AuthProvider>
+            {children}
+          </AuthProvider>
+        </FirebaseProvider>
       </body>
     </html>
   )

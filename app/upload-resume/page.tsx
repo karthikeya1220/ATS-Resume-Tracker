@@ -8,10 +8,13 @@ import { DragDropUpload } from "@/components/drag-drop-upload"
 import { RecentFileCard } from "@/components/recent-file-card"
 import { useMobile } from "@/hooks/use-mobile"
 import { ProtectedRoute } from "@/components/protected-route"
+import { useAuth } from "@/context/auth-context"
+import { UserDropdown } from "@/components/user-dropdown"
 
 export default function UploadResumePage() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
   const isMobile = useMobile()
+  const { user } = useAuth()
 
   // Close sidebar by default on mobile
   useEffect(() => {
@@ -55,14 +58,7 @@ export default function UploadResumePage() {
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   </div>
 
-                  <div className="flex items-center space-x-1">
-                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                      <User className="w-5 h-5 text-primary" />
-                    </div>
-                    <div className="hidden md:block">
-                      <span className="text-sm font-medium">John Doe</span>
-                    </div>
-                  </div>
+                  <UserDropdown user={user} />
                 </div>
               </div>
             </div>
